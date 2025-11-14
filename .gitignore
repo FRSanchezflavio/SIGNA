@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Build outputs
+dist/
+build/
+release/
+*.exe
+*.msi
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Environment
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Electron
+out/
+
+# Python virtual environment
+venv/
+env/
+.venv/
+
+# Backup files
+backups/
+*.bak
