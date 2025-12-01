@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import * as url from 'url';
+import * as fs from 'fs';
 import { spawn, ChildProcess } from 'child_process';
 
 let mainWindow: BrowserWindow | null = null;
@@ -42,7 +43,20 @@ function createWindow() {
 function startPythonBackend() {
   const pythonScript = path.join(__dirname, '../../backend/app.py');
 
-  pythonProcess = spawn('python', [pythonScript]);
+  let pythonExecutable = 'python';
+  const venvPath = path.join(__dirname, '../../backend/venv');
+  const venvPython = process.platform === 'win32'
+    ? path.join(venvPath, 'Scripts/python.exe')
+    : path.join(venvPath, 'bin/python');
+
+  if (fs.existsSync(venvPython)) {
+    pythonExecutable = venvPython;
+    console.log(`Using Python from venv: ${pythonExecutable}`);
+  } else {
+    console.log('Using global Python');
+  }
+
+  pythonProcess = spawn(pythonExecutable, [pythonScript]);
 
   pythonProcess.stdout?.on('data', data => {
     console.log(`Python Backend: ${data}`);
