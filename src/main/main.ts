@@ -45,9 +45,10 @@ function startPythonBackend() {
 
   let pythonExecutable = 'python';
   const venvPath = path.join(__dirname, '../../backend/venv');
-  const venvPython = process.platform === 'win32'
-    ? path.join(venvPath, 'Scripts/python.exe')
-    : path.join(venvPath, 'bin/python');
+  const venvPython =
+    process.platform === 'win32'
+      ? path.join(venvPath, 'Scripts/python.exe')
+      : path.join(venvPath, 'bin/python');
 
   if (fs.existsSync(venvPython)) {
     pythonExecutable = venvPython;

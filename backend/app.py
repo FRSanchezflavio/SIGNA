@@ -7,6 +7,10 @@ Flask Application
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
+import zipfile
+import tempfile
+import shutil
+import geopandas as gpd
 from dotenv import load_dotenv
 
 # Importar servicios
@@ -243,6 +247,61 @@ def generar_perfiles_mo():
         return jsonify(resultado), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/upload-shapefile', methods=['POST'])
+def upload_shapefile():
+    """
+    Carga un archivo ZIP con Shapefiles, lo procesa y devuelve GeoJSON
+    """
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    
+    if file and file.filename.endswith('.zip'):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            zip_path = os.path.join(temp_dir, file.filename)
+            file.save(zip_path)
+            
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+            
+            # Buscar archivo .shp
+            shp_file = None
+            for root, dirs, files in os.walk(temp_dir):
+                for f in files:
+                    if f.endswith('.shp'):
+                        shp_file = os.path.join(root, f)
+                        break
+                if shp_file:
+                    break
+            
+            if not shp_file:
+                return jsonify({'error': 'No .shp file found in zip'}), 400
+            
+            # Leer shapefile
+            gdf = gpd.read_file(shp_file)
+            
+            # Convertir a WGS84 (EPSG:4326) si es necesario
+            if gdf.crs != 'EPSG:4326':
+                gdf = gdf.to_crs('EPSG:4326')
+            
+            # Convertir a GeoJSON
+            geojson_data = gdf.to_json()
+            
+            return jsonify({'status': 'success', 'data': geojson_data}), 200
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            shutil.rmtree(temp_dir)
+    
+    return jsonify({'error': 'Invalid file type. Please upload a ZIP file.'}), 400
 
 
 if __name__ == '__main__':
