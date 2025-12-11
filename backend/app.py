@@ -252,7 +252,8 @@ def generar_perfiles_mo():
 @app.route('/api/upload-shapefile', methods=['POST'])
 def upload_shapefile():
     """
-    Carga un archivo ZIP con Shapefiles, lo procesa y devuelve GeoJSON
+    Carga un archivo ZIP con Shapefiles, lo procesa y devuelve GeoJSON.
+    Optimizado para compatibilidad con QGIS 2.14 Essen (manejo de encoding 'latin1' y 'System').
     """
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
@@ -273,31 +274,95 @@ def upload_shapefile():
             
             # Buscar archivo .shp
             shp_file = None
+            base_path = None
+            base_filename = None
+            
             for root, dirs, files in os.walk(temp_dir):
                 for f in files:
-                    if f.endswith('.shp'):
+                    if f.lower().endswith('.shp'):
                         shp_file = os.path.join(root, f)
+                        base_path = root
+                        base_filename = os.path.splitext(f)[0]
                         break
                 if shp_file:
                     break
             
             if not shp_file:
-                return jsonify({'error': 'No .shp file found in zip'}), 400
+                return jsonify({'error': 'El ZIP no contiene ningún archivo .shp válido.'}), 400
             
-            # Leer shapefile
-            gdf = gpd.read_file(shp_file)
+            # Verificación básica de archivos sidecar (.shx, .dbf)
+            # Intentamos encontrar los archivos mandatorios.
+            required_extensions = ['.shx', '.dbf']
+            missing_files = []
+            
+            # Listar archivos en el directorio del shapefile para búsqueda case-insensitive
+            files_in_dir = os.listdir(base_path)
+            files_lower = {f.lower(): f for f in files_in_dir}
+            
+            for ext in required_extensions:
+                expected_file_lower = (base_filename + ext).lower()
+                if expected_file_lower not in files_lower:
+                    missing_files.append(ext)
+            
+            if missing_files:
+                return jsonify({'error': f'Archivo incompleto. Faltan componentes: {", ".join(missing_files)}'}), 400
+
+            # Detección de Encoding (Específico para QGIS viejos)
+            # 1. Buscar archivo .cpg
+            encoding = None
+            cpg_file_lower = (base_filename + '.cpg').lower()
+            if cpg_file_lower in files_lower:
+                try:
+                    with open(os.path.join(base_path, files_lower[cpg_file_lower]), 'r') as f:
+                        encoding = f.read().strip()
+                except:
+                    pass
+            
+            # 2. Leer shapefile
+            gdf = None
+            read_error = None
+            
+            # Lista de encodings para probar (QGIS 2.14 usa mucho system locale/latin1)
+            encodings_to_try = []
+            if encoding:
+                encodings_to_try.append(encoding)
+            encodings_to_try.extend(['utf-8', 'latin1', 'cp1252'])
+            
+            for enc in encodings_to_try:
+                try:
+                    gdf = gpd.read_file(shp_file, encoding=enc)
+                    break 
+                except Exception as e:
+                    read_error = e
+                    continue
+            
+            if gdf is None:
+                return jsonify({'error': f'No se pudo leer el archivo. Posible problema de codificación. Error: {str(read_error)}'}), 400
             
             # Convertir a WGS84 (EPSG:4326) si es necesario
-            if gdf.crs != 'EPSG:4326':
-                gdf = gdf.to_crs('EPSG:4326')
-            
+            if gdf.crs:
+                try:
+                    if gdf.crs.to_string() != 'EPSG:4326':
+                        gdf = gdf.to_crs('EPSG:4326')
+                except Exception as e:
+                    return jsonify({'error': f'Error al reproyectar coordenadas: {str(e)}'}), 400
+            else:
+                # Si no tiene CRS, advertimos pero intentamos continuar
+                print("Advertencia: El Shapefile no tiene sistema de referencia de coordenadas (.prj) definido.")
+
             # Convertir a GeoJSON
             geojson_data = gdf.to_json()
             
-            return jsonify({'status': 'success', 'data': geojson_data}), 200
+            count = len(gdf)
+            
+            return jsonify({
+                'status': 'success', 
+                'data': geojson_data,
+                'message': f'Se cargaron {count} elementos correctamente.'
+            }), 200
             
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({'error': f'Error interno al procesar el archivo: {str(e)}'}), 500
         finally:
             shutil.rmtree(temp_dir)
     

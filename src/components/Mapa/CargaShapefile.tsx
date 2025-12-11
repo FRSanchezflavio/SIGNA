@@ -66,7 +66,11 @@ export default function CargaShapefile({ onDataLoaded }: CargaShapefileProps) {
       <CardHeader>
         <CardTitle>Cargar Capa Geográfica</CardTitle>
         <CardDescription>
-          Suba un archivo .zip que contenga los archivos Shapefile (.shp, .shx, .dbf, etc.) exportados de QGIS.
+          Suba un archivo ZIP con los archivos Shapefile (.shp, .shx, .dbf) exportados de QGIS.
+          <br />
+          <span className="text-xs text-muted-foreground">
+            Compatibilidad optimizada para QGIS 2.14 "Essen" y codificaciones antiguas (Latin1/System).
+          </span>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -76,20 +80,20 @@ export default function CargaShapefile({ onDataLoaded }: CargaShapefileProps) {
         </div>
         
         {error && (
-          <div className="flex items-center text-destructive text-sm">
-            <AlertCircle className="mr-2 h-4 w-4" />
-            {error}
+          <div className="flex items-start text-destructive text-sm p-3 bg-destructive/10 rounded-md">
+            <AlertCircle className="mr-2 h-4 w-4 mt-0.5 shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
         {success && (
-          <div className="flex items-center text-green-600 text-sm">
+          <div className="flex items-center text-green-600 text-sm p-3 bg-green-50 rounded-md">
             <CheckCircle2 className="mr-2 h-4 w-4" />
-            Carga exitosa. Los puntos se han visualizado en el mapa.
+            Carga exitosa. Capa visualizada en el mapa.
           </div>
         )}
 
-        <Button onClick={handleUpload} disabled={loading || !file}>
+        <Button onClick={handleUpload} disabled={loading || !file} className="w-full sm:w-auto">
           {loading ? (
             <>Cargando...</>
           ) : (
